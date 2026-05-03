@@ -1,0 +1,22 @@
+{
+  "name": "@lokal-ml/taladb-plugin",
+  "version": "0.1.0",
+  "description": "Lokal ML TalaDB RAG plugin — offline vector memory for on-device SLMs",
+  "main": "src/index",
+  "types": "src/index.tsx",
+  "files": ["src/"],
+  "peerDependencies": {
+    "@lokal-ml/react-native": ">=0.1.0",
+    "@taladb/react-native": ">=0.7.0"
+  },
+  "keywords": ["ai", "rag", "vector-search", "taladb", "on-device", "llm", "offline"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thinkgrid-labs/lokal-ml.git",
+    "directory": "packages/lokal-ml-taladb-plugin"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

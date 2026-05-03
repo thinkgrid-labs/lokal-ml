@@ -1,0 +1,41 @@
+[package]
+name        = "lokal-ml-taladb"
+version.workspace    = true
+edition.workspace    = true
+authors.workspace    = true
+license.workspace    = true
+description = "Lokal ML TalaDB RAG plugin: chunker, embedder, and vector injector"
+repository  = "https://github.com/thinkgrid-labs/lokal-ml"
+
+[dependencies]
+# Core inference engine — sibling crate in this workspace
+lokal-ml-core = { path = "../lokal-ml-core" }
+
+# TalaDB — local path dep until taladb-core is published to crates.io
+# Switch to `taladb-core = { version = "0.7", features = ["vector-hnsw"] }` post-release
+taladb-core = { path = "../../../taladb/packages/taladb-core", features = ["vector-hnsw"] }
+
+# Unique chunk IDs
+ulid       = { version = "1.1", features = ["serde"] }
+
+# Async runtime (shared with core)
+tokio      = { version = "1", features = ["rt", "macros"] }
+
+# Embedding model execution (all-MiniLM-L6-v2 via GGUF)
+# Re-uses the same llama-cpp-2 path as the inference engine
+llama-cpp-2 = "0.1"
+
+# Serialisation
+serde      = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror  = "1.0"
+anyhow     = "1.0"
+
+# Logging
+tracing    = "0.1"
+
+[dev-dependencies]
+tempfile   = "3.10"
+tokio      = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }

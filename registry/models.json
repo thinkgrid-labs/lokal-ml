@@ -1,0 +1,28 @@
+{
+  "models": {
+    "gemma-2b-int4": {
+      "id": "gemma-2b-int4",
+      "url": "https://huggingface.co/google/gemma-2b-GGUF/resolve/main/gemma-2b-it-q4_k_m.gguf",
+      "sha256": "PLACEHOLDER_SHA256_GEMMA_2B",
+      "size_bytes": 1610612736,
+      "min_ram_mb": 2200,
+      "description": "Gemma 2B instruction-tuned, 4-bit quantized"
+    },
+    "qwen-1.5b-int4": {
+      "id": "qwen-1.5b-int4",
+      "url": "https://huggingface.co/Qwen/Qwen1.5-1.8B-Chat-GGUF/resolve/main/qwen1_5-1_8b-chat-q4_k_m.gguf",
+      "sha256": "PLACEHOLDER_SHA256_QWEN_1_5B",
+      "size_bytes": 1073741824,
+      "min_ram_mb": 1500,
+      "description": "Qwen 1.5B chat, 4-bit quantized — suitable for 3 GB devices"
+    },
+    "all-minilm-l6-v2": {
+      "id": "all-minilm-l6-v2",
+      "url": "https://huggingface.co/second-state/All-MiniLM-L6-v2-Embedding-GGUF/resolve/main/all-MiniLM-L6-v2-Q8_0.gguf",
+      "sha256": "PLACEHOLDER_SHA256_MINILM",
+      "size_bytes": 23068672,
+      "min_ram_mb": 256,
+      "description": "all-MiniLM-L6-v2 embedding model, 8-bit — 384-dim vectors for RAG"
+    }
+  }
+}

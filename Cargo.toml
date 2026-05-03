@@ -1,0 +1,24 @@
+[workspace]
+resolver = "2"
+members = [
+    "packages/lokal-ml-core",
+    "packages/lokal-ml-taladb",
+    "packages/lokal-ml-react-native/rust",
+]
+
+[workspace.package]
+version      = "0.1.0"
+edition      = "2021"
+authors      = ["thinkgrid-labs"]
+license      = "MIT"
+repository   = "https://github.com/thinkgrid-labs/lokal-ml"
+
+[profile.release]
+opt-level = 3
+lto       = true
+strip     = true
+
+# Mobile-optimised: minimise binary size for App Store compliance
+[profile.release-mobile]
+inherits  = "release"
+opt-level = "z"

@@ -1,0 +1,40 @@
+# Build output
+target/
+node_modules/
+dist/
+build/
+
+# Model cache (never commit binary weights)
+*.gguf
+*.bin
+models/
+
+# XCFramework build artefacts
+*.xcframework
+*.a
+*.so
+*.dylib
+
+# CocoaPods
+ios/Pods/
+*.xcworkspace
+
+# Android
+android/build/
+android/.gradle/
+local.properties
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local

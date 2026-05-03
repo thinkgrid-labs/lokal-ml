@@ -1,0 +1,15 @@
+{
+  "name": "lokal-ml",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Lokal ML monorepo — on-device SLM inference SDK for React Native and Flutter",
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "build:ios": "pnpm --filter @lokal-ml/react-native build:ios",
+    "build:android": "pnpm --filter @lokal-ml/react-native build:android"
+  },
+  "engines": {
+    "node": ">=18",
+    "pnpm": ">=9"
+  }
+}

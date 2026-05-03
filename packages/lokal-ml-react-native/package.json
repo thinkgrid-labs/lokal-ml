@@ -1,0 +1,51 @@
+{
+  "name": "@lokal-ml/react-native",
+  "version": "0.1.0",
+  "description": "Lokal ML React Native module — on-device SLM inference via JSI",
+  "main": "src/index",
+  "types": "src/index.tsx",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build:ios": "sh scripts/build-ios.sh",
+    "build:android": "sh scripts/build-android.sh",
+    "build:cbindgen": "cbindgen --config rust/cbindgen.toml --crate lokal-ml-ffi --output cpp/lokal-ml.h"
+  },
+  "files": [
+    "src/",
+    "cpp/",
+    "ios/",
+    "android/",
+    "lokal-ml-react-native.podspec"
+  ],
+  "peerDependencies": {
+    "react-native": ">=0.73.0"
+  },
+  "keywords": [
+    "ai",
+    "llm",
+    "slm",
+    "on-device",
+    "local-inference",
+    "react-native",
+    "jsi",
+    "gguf",
+    "offline"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thinkgrid-labs/lokal-ml.git",
+    "directory": "packages/lokal-ml-react-native"
+  },
+  "homepage": "https://lokal-ml.dev/guide/react-native",
+  "bugs": {
+    "url": "https://github.com/thinkgrid-labs/lokal-ml/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "react-native": "^0.76.0"
+  }
+}

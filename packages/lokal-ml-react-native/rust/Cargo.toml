@@ -1,0 +1,15 @@
+[package]
+name        = "lokal-ml-ffi"
+version.workspace    = true
+edition.workspace    = true
+authors.workspace    = true
+license.workspace    = true
+description = "Lokal ML React Native FFI crate — C ABI exported for cbindgen"
+
+[lib]
+name   = "lokal_ml_ffi"
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+lokal-ml-core = { path = "../../lokal-ml-core" }
+tokio = { version = "1", features = ["rt", "rt-multi-thread"] }

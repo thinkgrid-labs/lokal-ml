@@ -142,11 +142,14 @@ mod tests {
 
         let engine = LokalEngine::load(&model_path, Default::default()).unwrap();
 
-        let mut tokens = Vec::new();
+        let tokens = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let tokens_clone = tokens.clone();
         engine
-            .chat_stream("Hello", |tok| tokens.push(tok.to_string()))
+            .chat_stream("Hello", move |tok| {
+                tokens_clone.lock().unwrap().push(tok.to_string());
+            })
             .unwrap();
 
-        assert!(!tokens.is_empty());
+        assert!(!tokens.lock().unwrap().is_empty());
     }
 }

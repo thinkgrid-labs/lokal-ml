@@ -8,7 +8,7 @@
 //! ```rust
 //! use lokal_ml_taladb::chunker::chunk_text;
 //!
-//! let chunks = chunk_text("Hello world. This is a test.", 3, 1).unwrap();
+//! let chunks = chunk_text("Hello world. This is a test.", "doc1", 3, 1).unwrap();
 //! assert_eq!(chunks.len(), 3);
 //! ```
 

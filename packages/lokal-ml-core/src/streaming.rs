@@ -22,6 +22,7 @@ impl TokenStream {
     }
 
     /// Collect all remaining tokens into a single `String`.
+    #[must_use]
     pub async fn collect(mut self) -> String {
         let mut result = String::new();
         while let Some(token) = self.next().await {
@@ -35,6 +36,7 @@ impl TokenStream {
 ///
 /// The engine runs on a `tokio::task::spawn_blocking` thread so the async
 /// executor is never stalled by CPU-bound matrix math.
+#[must_use = "dropping the TokenStream discards all generated tokens"]
 pub fn stream_tokens(
     engine: std::sync::Arc<LokalEngine>,
     prompt: String,

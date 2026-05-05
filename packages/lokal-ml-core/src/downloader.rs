@@ -14,6 +14,7 @@ use futures::StreamExt;
 use reqwest::Client;
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
+use subtle::ConstantTimeEq;
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::{debug, info, warn};
@@ -152,7 +153,9 @@ async fn verify_sha256(path: &Path, expected: &str) -> Result<(), DownloadError>
     }
 
     let actual = hex::encode(hasher.finalize());
-    if actual != expected {
+    // Constant-time comparison prevents timing side-channels on the hash.
+    let equal: bool = actual.as_bytes().ct_eq(expected.as_bytes()).into();
+    if !equal {
         return Err(DownloadError::HashMismatch {
             expected: expected.to_string(),
             actual,

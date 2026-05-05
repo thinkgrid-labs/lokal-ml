@@ -7,6 +7,7 @@
 //! `lokal-ml-taladb` and `taladb-core` are Rust crates, vectors cross from
 //! the embedding model output directly into the TalaDB memory arena.
 
+use anyhow::Result;
 use crate::chunker::Chunk;
 use thiserror::Error;
 use tracing::info;
@@ -93,7 +94,7 @@ pub fn ingest_document(
     text: &str,
     chunk_size: usize,
     overlap: usize,
-) -> Result<usize, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<usize> {
     let chunks = crate::chunker::chunk_text(text, doc_id, chunk_size, overlap)?;
 
     let texts: Vec<&str> = chunks.iter().map(|c| c.text.as_str()).collect();

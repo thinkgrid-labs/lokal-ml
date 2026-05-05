@@ -59,6 +59,13 @@ pub struct LokalEngine {
     // model: llama_cpp_2::model::LlamaModel,
 }
 
+// llama.cpp model/context handles are internally synchronized by the C++ layer.
+// Safety: the handles must not be aliased mutably across threads; llama.cpp
+// enforces this through its own locking. When adding the real handle field,
+// document the specific llama.cpp guarantees relied upon here.
+unsafe impl Send for LokalEngine {}
+unsafe impl Sync for LokalEngine {}
+
 impl LokalEngine {
     /// Load a GGUF model from disk and initialise the inference context.
     ///

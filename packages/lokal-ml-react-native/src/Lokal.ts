@@ -1,7 +1,11 @@
-import { NativeModules } from 'react-native';
 import type { LokalConfig, ChatOptions, ChatResponse, PluginRegistry, LokalPlugin } from './types';
 
-const { LokalMLNative } = NativeModules;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const LokalMLNative = (global as any).LokalMLNative as {
+  initEngine(config: { model: string; contextSize: number; threads: number }): number;
+  chat(handle: number, options: Record<string, unknown>): ChatResponse;
+  disposeEngine(handle: number): void;
+};
 
 /**
  * A loaded Lokal ML engine instance.

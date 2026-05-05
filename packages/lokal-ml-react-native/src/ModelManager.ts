@@ -1,10 +1,15 @@
-import { NativeModules } from 'react-native';
 import type { DownloadOptions } from './types';
 
-// Access the JSI HostObject injected by the native layer.
-// On iOS: registered in LokalML.mm via jsi::Runtime::global().setProperty()
-// On Android: registered in LokalML.cpp via the same JSI global.
-const { LokalMLNative } = NativeModules;
+// The JSI HostObject is registered on the JS global (not NativeModules) via
+// jsi::Runtime::global().setProperty() in LokalML.mm / LokalML.cpp.
+// NativeModules is a separate React Native registry and will not contain it.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const LokalMLNative = (global as any).LokalMLNative as {
+  checkRequirements(modelId: string): boolean;
+  downloadModel(modelId: string, requireWifi: boolean, onProgress: ((p: number) => void) | null): void;
+  isModelCached(modelId: string): boolean;
+  deleteModel(modelId: string): void;
+};
 
 /**
  * ModelManager

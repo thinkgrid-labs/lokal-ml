@@ -82,8 +82,9 @@ impl Embedder {
 
     /// Embed a batch of texts, returning one vector per input.
     ///
-    /// More efficient than calling `embed()` in a loop for large batches
-    /// (single model load, amortised tokenisation).
+    /// Currently calls `embed()` sequentially. When the real llama.cpp layer is
+    /// integrated this should be replaced with a single-pass forward call using
+    /// `llama_batch` so tokenisation cost is amortised across the whole batch.
     pub fn embed_batch(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, EmbedError> {
         texts.iter().map(|t| self.embed(t)).collect()
     }

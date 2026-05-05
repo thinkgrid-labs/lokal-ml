@@ -10,7 +10,7 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  # ─── Rust ───────────────────────────────────────────────────────────────────
+  # ─── Rust (host) ─────────────────────────────────────────────────────────────
   rust:
     name: Rust (check / test / clippy)
     runs-on: ubuntu-latest
@@ -42,6 +42,82 @@ jobs:
 
       - name: cargo clippy
         run: cargo clippy --workspace -- -D warnings
+
+  # ─── Security audit ──────────────────────────────────────────────────────────
+  audit:
+    name: cargo audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run security audit
+        run: cargo audit
+
+  # ─── Cross-compilation: iOS ──────────────────────────────────────────────────
+  # Checks that the FFI crate compiles for the primary iOS target.
+  # Requires the aarch64-apple-ios target and the Xcode SDK; only runs on macOS.
+  cross-ios:
+    name: Cross-compile (aarch64-apple-ios)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain + iOS targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ios-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: cargo check (aarch64-apple-ios)
+        run: cargo check --workspace --target aarch64-apple-ios
+
+      - name: cargo check (iOS Simulator arm64)
+        run: cargo check --workspace --target aarch64-apple-ios-sim
+
+  # ─── Cross-compilation: Android ──────────────────────────────────────────────
+  # Checks that the FFI crate compiles for the primary Android ABI targets.
+  cross-android:
+    name: Cross-compile (Android ABIs)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - aarch64-linux-android
+          - armv7-linux-androideabi
+          - x86_64-linux-android
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain + Android target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross
+        run: cargo install cross --locked
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: android-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: cross check (${{ matrix.target }})
+        run: cross check --workspace --target ${{ matrix.target }}
 
   # ─── TypeScript ─────────────────────────────────────────────────────────────
   typescript:

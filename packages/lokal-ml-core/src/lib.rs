@@ -9,6 +9,7 @@
 //! - [`streaming`]  — Token stream producer
 //! - [`registry`]   — Model registry manifest parser
 
+pub mod backend;
 pub mod downloader;
 pub mod engine;
 pub mod hardware;

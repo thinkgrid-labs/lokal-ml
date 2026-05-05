@@ -60,21 +60,23 @@ pub fn stream_tokens(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::engine::{EngineConfig, LokalEngine};
-    use std::sync::Arc;
+    use crate::engine::{EngineConfig, EngineError, LokalEngine};
+    use std::path::Path;
     use tempfile::tempdir;
 
     #[tokio::test]
-    async fn stream_collects_all_tokens() {
+    async fn stream_errors_on_invalid_model() {
         let dir = tempdir().unwrap();
-        let model_path = dir.path().join("stub.gguf");
-        std::fs::write(&model_path, b"stub").unwrap();
+        let path = dir.path().join("bad.gguf");
+        std::fs::write(&path, b"not a gguf").unwrap();
+        // Loading should fail; stream_tokens never gets a chance to run.
+        let result = LokalEngine::load(&path, EngineConfig::default());
+        assert!(matches!(result, Err(EngineError::LoadFailed { .. })));
+    }
 
-        let engine = Arc::new(LokalEngine::load(&model_path, EngineConfig::default()).unwrap());
-        let mut stream = stream_tokens(engine, "test prompt".to_string(), 32).unwrap();
-
-        let collected = stream.collect().await;
-        assert!(!collected.is_empty());
+    #[test]
+    fn stream_errors_on_missing_model() {
+        let result = LokalEngine::load(Path::new("/no/such/model.gguf"), EngineConfig::default());
+        assert!(matches!(result, Err(EngineError::LoadFailed { .. })));
     }
 }

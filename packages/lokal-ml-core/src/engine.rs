@@ -1,12 +1,16 @@
-//! GGUF inference engine.
-//!
-//! Wraps the `llama-cpp-2` crate to load a quantized model from disk and
-//! execute inference with token streaming. The engine is designed to run on
-//! a dedicated background thread, keeping the UI thread fully responsive.
-
+use std::num::NonZeroU32;
 use std::path::Path;
+
+use llama_cpp_2::{
+    context::params::LlamaContextParams,
+    llama_batch::LlamaBatch,
+    model::{params::LlamaModelParams, AddBos, LlamaModel},
+    sampling::LlamaSampler,
+};
 use thiserror::Error;
 use tracing::{debug, info};
+
+use crate::backend;
 
 #[derive(Debug, Error)]
 pub enum EngineError {
@@ -29,10 +33,12 @@ pub struct EngineConfig {
     pub threads: u32,
     /// Maximum tokens to generate per response
     pub max_tokens: u32,
-    /// Sampling temperature (0.0 = deterministic, 1.0 = creative)
+    /// Sampling temperature (0.0 = greedy / deterministic, 1.0 = creative)
     pub temperature: f32,
-    /// Enable Metal GPU acceleration on Apple Silicon (iOS/macOS)
-    pub use_metal: bool,
+    /// Number of model layers to offload to GPU.
+    /// `u32::MAX` offloads all layers (Metal on Apple Silicon, Vulkan on Android).
+    /// `0` forces CPU-only execution.
+    pub gpu_layers: u32,
 }
 
 impl Default for EngineConfig {
@@ -42,27 +48,25 @@ impl Default for EngineConfig {
             threads: 4,
             max_tokens: 512,
             temperature: 0.7,
-            use_metal: cfg!(target_os = "ios") || cfg!(target_os = "macos"),
+            // Offload all layers on Apple Silicon; CPU-only elsewhere.
+            gpu_layers: if cfg!(any(target_os = "ios", target_os = "macos")) {
+                u32::MAX
+            } else {
+                0
+            },
         }
     }
 }
 
 /// A loaded inference engine instance.
-///
-/// This is intentionally opaque — the llama-cpp-2 model handle is held
-/// internally. Thread-safety is enforced by the underlying C++ layer.
 pub struct LokalEngine {
     config: EngineConfig,
     model_path: String,
-    // NOTE: The actual llama.cpp model/context handles will be added here
-    // once the llama-cpp-2 crate API is finalised.
-    // model: llama_cpp_2::model::LlamaModel,
+    model: LlamaModel,
 }
 
-// llama.cpp model/context handles are internally synchronized by the C++ layer.
-// Safety: the handles must not be aliased mutably across threads; llama.cpp
-// enforces this through its own locking. When adding the real handle field,
-// document the specific llama.cpp guarantees relied upon here.
+// LlamaModel is Send + Sync (llama.cpp handles its own internal locking).
+// Declaring these explicitly documents the invariant for future contributors.
 unsafe impl Send for LokalEngine {}
 unsafe impl Sync for LokalEngine {}
 
@@ -80,20 +84,27 @@ impl LokalEngine {
             });
         }
 
-        // TODO: Initialise llama_cpp_2::model::LlamaModel here when integrating
-        // the llama-cpp-2 crate. The placeholder below validates the file path
-        // and config without touching the C++ layer during initial development.
+        let model_params = LlamaModelParams::default().with_n_gpu_layers(config.gpu_layers);
+
+        let model = LlamaModel::load_from_file(backend::get(), model_path, &model_params)
+            .map_err(|e| EngineError::LoadFailed {
+                path: model_path.display().to_string(),
+                reason: e.to_string(),
+            })?;
 
         info!(
             context_size = config.context_size,
             threads = config.threads,
-            use_metal = config.use_metal,
+            gpu_layers = config.gpu_layers,
+            n_embd = model.n_embd(),
+            n_layers = model.n_layer(),
             "Engine initialised"
         );
 
         Ok(Self {
             config,
             model_path: model_path.display().to_string(),
+            model,
         })
     }
 
@@ -108,13 +119,91 @@ impl LokalEngine {
     ) -> Result<(), EngineError> {
         debug!(prompt_len = prompt.len(), "Starting inference stream");
 
-        // TODO: Wire in llama_cpp_2 inference loop here.
-        // The placeholder emits a single echo token so the streaming pipeline
-        // can be tested end-to-end before the C++ layer is wired up.
-        on_token("[STUB] Model loaded from: ");
-        on_token(&self.model_path);
-        on_token(" | Prompt: ");
-        on_token(prompt);
+        let n_threads = i32::try_from(self.config.threads).unwrap_or(4);
+
+        let ctx_params = LlamaContextParams::default()
+            .with_n_ctx(NonZeroU32::new(self.config.context_size))
+            .with_n_threads(n_threads)
+            .with_n_threads_batch(n_threads);
+
+        let mut ctx = self
+            .model
+            .new_context(backend::get(), ctx_params)
+            .map_err(|e| EngineError::InferenceFailed(e.to_string()))?;
+
+        let tokens = self
+            .model
+            .str_to_token(prompt, AddBos::Always)
+            .map_err(|e| EngineError::InferenceFailed(e.to_string()))?;
+
+        if tokens.is_empty() {
+            return Ok(());
+        }
+
+        let n_prompt = tokens.len();
+        if n_prompt >= self.config.context_size as usize {
+            return Err(EngineError::InferenceFailed(format!(
+                "Prompt is too long ({n_prompt} tokens) for context window ({})",
+                self.config.context_size
+            )));
+        }
+
+        // Prefill: decode the entire prompt, enabling logits only for the last token.
+        let mut batch = LlamaBatch::new(n_prompt, 1);
+        for (i, &token) in tokens.iter().enumerate() {
+            let is_last = i == n_prompt - 1;
+            batch
+                .add(token, i as i32, &[0_i32], is_last)
+                .map_err(|e| EngineError::InferenceFailed(e.to_string()))?;
+        }
+        ctx.decode(&mut batch)
+            .map_err(|e| EngineError::InferenceFailed(e.to_string()))?;
+
+        // Autoregressive generation.
+        let sampler_chain: Vec<LlamaSampler> = if self.config.temperature == 0.0 {
+            vec![LlamaSampler::greedy()]
+        } else {
+            vec![
+                LlamaSampler::temp(self.config.temperature),
+                LlamaSampler::dist(1337),
+            ]
+        };
+        let mut sampler = LlamaSampler::chain_simple(sampler_chain);
+        let mut decoder = encoding_rs::UTF_8.new_decoder();
+        let mut pos = n_prompt as i32;
+        let mut n_generated: u32 = 0;
+
+        loop {
+            // Sample from last decode's logits (idx = -1 → last output position).
+            let token = sampler.sample(&ctx, -1);
+            sampler.accept(token);
+
+            if self.model.is_eog_token(token) {
+                break;
+            }
+
+            let piece = self
+                .model
+                .token_to_piece(token, &mut decoder, true, None)
+                .map_err(|e| EngineError::InferenceFailed(e.to_string()))?;
+
+            on_token(&piece);
+            n_generated += 1;
+
+            if n_generated >= self.config.max_tokens {
+                break;
+            }
+
+            // Feed the sampled token back so the next sample has fresh logits.
+            batch.clear();
+            batch
+                .add(token, pos, &[0_i32], true)
+                .map_err(|e| EngineError::InferenceFailed(e.to_string()))?;
+            pos += 1;
+
+            ctx.decode(&mut batch)
+                .map_err(|e| EngineError::InferenceFailed(e.to_string()))?;
+        }
 
         Ok(())
     }
@@ -142,21 +231,12 @@ mod tests {
     }
 
     #[test]
-    fn chat_stream_emits_tokens() {
+    fn load_fails_for_invalid_gguf() {
         let dir = tempdir().unwrap();
-        let model_path = dir.path().join("stub.gguf");
-        std::fs::write(&model_path, b"stub").unwrap();
-
-        let engine = LokalEngine::load(&model_path, Default::default()).unwrap();
-
-        let tokens = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
-        let tokens_clone = tokens.clone();
-        engine
-            .chat_stream("Hello", move |tok| {
-                tokens_clone.lock().unwrap().push(tok.to_string());
-            })
-            .unwrap();
-
-        assert!(!tokens.lock().unwrap().is_empty());
+        let path = dir.path().join("bad.gguf");
+        std::fs::write(&path, b"this is not a gguf file").unwrap();
+        // llama.cpp will reject the file — expect a LoadFailed error.
+        let result = LokalEngine::load(&path, Default::default());
+        assert!(matches!(result, Err(EngineError::LoadFailed { .. })));
     }
 }

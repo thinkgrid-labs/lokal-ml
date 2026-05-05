@@ -13,3 +13,4 @@ crate-type = ["staticlib", "cdylib"]
 [dependencies]
 lokal-ml-core = { path = "../../lokal-ml-core" }
 tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
+tracing = "0.1"

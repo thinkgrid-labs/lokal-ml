@@ -17,6 +17,9 @@ reqwest    = { version = "0.12", default-features = false, features = ["stream",
 # llama.cpp GGUF execution (Metal on iOS/macOS, NEON on Android ARM64)
 llama-cpp-2 = "0.1"
 
+# Stateful UTF-8 decoder for token-to-piece conversion (token bytes may be partial UTF-8)
+encoding_rs = "0.8"
+
 # System hardware introspection (RAM, CPU arch)
 sysinfo    = "0.30"
 

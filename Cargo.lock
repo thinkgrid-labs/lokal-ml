@@ -969,6 +969,7 @@ name = "lokal-ml-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "encoding_rs",
  "futures",
  "hex",
  "llama-cpp-2",
@@ -976,6 +977,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "subtle",
  "sysinfo",
  "tempfile",
  "thiserror 1.0.69",
@@ -991,6 +993,7 @@ version = "0.1.0"
 dependencies = [
  "lokal-ml-core",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

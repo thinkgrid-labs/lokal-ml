@@ -1,66 +1,68 @@
-# 🚀 Lokal ML (@lokal-ml)
+![Lokal ML](./lokal-ml.jpg)
+
+# Lokal ML (@lokal-ml)
 
 > **The Local-First Mobile LLM Infrastructure. Zero friction. Pure Rust. Native Edge AI.**
 
 > [!WARNING]
-> **🚧 Active Development — Not Production Ready**  
-> Lokal ML is under active construction. APIs are unstable and subject to change. Contributions and early feedback are very welcome — star the repo to follow progress.
+> **Active Development — Not Production Ready**  
+> The Rust core (hardware profiler, resumable downloader, GGUF inference engine, TalaDB RAG embedder) is implemented. The React Native JSI bridge and TypeScript API surface are still being wired up. APIs are unstable and subject to change. Contributions and early feedback are very welcome — star the repo to follow progress.
 
 ---
 
-## 🛑 The Problem
+## The Problem
 
 Running Small Language Models (SLMs) like Gemma directly on mobile devices is the future of privacy-first, zero-latency applications. But today, the Developer Experience (DX) is fundamentally broken:
 
-- **The App Store Trap:** Bundling a 1.5GB+ `.gguf` quantized model directly into an app binary destroys user acquisition and violates App Store cellular download limits.
+- **The App Store Trap:** Bundling a 1.5 GB+ `.gguf` quantized model directly into an app binary destroys user acquisition and violates App Store cellular download limits.
 - **The C++ Boilerplate:** React Native and Flutter developers are forced to wrestle with complex C++ wrappers, asynchronous bridging overhead, and memory leaks just to stream tokens.
 - **The RAG Fragmentation:** Building offline Retrieval-Augmented Generation (RAG) requires developers to manually stitch together text chunkers, separate embedding models, and local vector databases.
 
 ---
 
-## 🌟 The Manifesto
-
-Lokal ML is an open-source, infrastructure-grade SDK designed to bring local, on-device SLMs to React Native and Flutter with absolute zero friction.
-
-Built on a pure-Rust core for maximum memory safety and cross-platform performance, Lokal ML abstracts away the brutal complexities of mobile ML. It handles the hardware constraints, the model delivery, and the vector math — so you can focus on shipping features.
-
----
-
-## 🏗️ Core Architecture
+## Architecture
 
 | Layer | Description |
 |---|---|
-| 🦀 **Pure Rust Core** | High-performance, memory-safe execution via `llama-cpp-2` (GGUF/Metal/NEON) |
-| ⚡ **Zero-Overhead Bridging** | Direct JSI for React Native, `flutter_rust_bridge` FFI for Flutter — instant token streaming, no async bottlenecks |
-| 📦 **Shell & Fetch Delivery** | Resumable background downloader that profiles device hardware and fetches model weights post-install. Initial binary stays < 50 MB |
-| 🧠 **Plug-and-Play Local RAG** | Optional TalaDB plugin that auto-chunks text, runs a local embedding model, and persists vectors natively — Rust-to-Rust, zero serialisation |
+| 🦀 **Pure Rust Core** | Memory-safe GGUF inference via `llama-cpp-2` — Metal GPU on iOS/macOS, NEON on Android ARM64, CPU fallback everywhere else |
+| ⚡ **Zero-Overhead Bridging** | Direct JSI for React Native, `flutter_rust_bridge` FFI for Flutter — per-token streaming via C-ABI callbacks, no async bottlenecks |
+| 📦 **Shell & Fetch Delivery** | Resumable background downloader with HTTP Range support and SHA-256 integrity verification. Device hardware is profiled before any download to prevent OOM crashes. Initial app binary stays < 50 MB |
+| 🧠 **Plug-and-Play Local RAG** | Optional TalaDB plugin: auto-chunks text, runs `all-MiniLM-L6-v2` locally for 384-dim embeddings, persists vectors in TalaDB's HNSW index — Rust-to-Rust, zero serialisation overhead |
 
 ### Repository Structure
 
 ```
 lokal-ml/
 ├── packages/
-│   ├── lokal-ml-core/                # 🦀 Rust: hardware profiler, downloader, GGUF engine
-│   ├── lokal-ml-taladb/              # 🦀 Rust: chunker, embedder, TalaDB vector injector
+│   ├── lokal-ml-core/                # 🦀 Rust: hardware profiler, resumable downloader, GGUF engine
+│   ├── lokal-ml-taladb/              # 🦀 Rust: text chunker, MiniLM embedder, TalaDB vector injector
 │   ├── lokal-ml-react-native/        # 📱 React Native JSI bridge + TypeScript API
 │   │   └── rust/                     #    C-ABI FFI layer (cbindgen → lokal-ml.h)
 │   └── lokal-ml-taladb-plugin/       # 🔌 @lokal-ml/taladb-plugin TypeScript wrapper
 └── registry/
-    └── models.json                   # Model manifest (URLs, SHA-256, hardware requirements)
+    └── models.json                   # Model manifest (URLs, SHA-256, min RAM requirements)
 ```
+
+### Model Registry
+
+| Model ID | Description | Size | Min RAM |
+|---|---|---|---|
+| `gemma-2b-int4` | Gemma 2B instruction-tuned, 4-bit quantized | ~1.5 GB | 2200 MB |
+| `qwen-1.5b-int4` | Qwen 1.5B chat, 4-bit quantized | ~1.0 GB | 1500 MB |
+| `all-minilm-l6-v2` | all-MiniLM-L6-v2 embeddings, 8-bit (RAG only) | ~22 MB | 256 MB |
 
 ---
 
-## 💻 Developer Experience (DX)
-
-### Packages
+## Packages
 
 | Package | Status | Description |
 |---|---|---|
 | `@lokal-ml/react-native` | 🚧 In Development | Core engine — hardware check, model download, GGUF inference |
 | `@lokal-ml/taladb-plugin` | 🚧 In Development | Optional RAG layer — offline vector memory via TalaDB |
 
-### The Vision
+---
+
+## Developer Experience
 
 ```ts
 import { Lokal, ModelManager } from '@lokal-ml/react-native';
@@ -113,21 +115,25 @@ await ai.chat({
 
 ## Development
 
+**Prerequisites:** Rust stable, cmake, Node ≥ 18, pnpm ≥ 9
+
 ```bash
 # Clone
 git clone https://github.com/thinkgrid-labs/lokal-ml
 cd lokal-ml
 
 # Rust workspace (requires cmake for llama.cpp)
-cargo check
-cargo test
+cargo fmt --all -- --check
+cargo clippy --workspace -- -D warnings
+cargo check --workspace
+cargo test --workspace
 
 # JS packages
 pnpm install
 pnpm typecheck
 ```
 
-> **Prerequisites:** Rust stable, cmake, Node ≥ 18, pnpm ≥ 9
+CI runs `fmt`, `clippy`, `check`, and `test` on every push via GitHub Actions, plus cross-compilation checks for `aarch64-apple-ios` and the three primary Android ABIs (`aarch64`, `armv7`, `x86_64`).
 
 ---
 

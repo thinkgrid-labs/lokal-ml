@@ -2,6 +2,48 @@
  * Shared TypeScript type definitions for @lokal-ml/react-native.
  */
 
+// ─── Model Registry ───────────────────────────────────────────────────────────
+
+/**
+ * Capability and tier tags attached to each model spec.
+ *
+ * Tier meanings:
+ *   tier:nano       — < 1 GB download, < 1.5 GB RAM — any modern phone
+ *   tier:compact    — 1–4 GB download, 2–4 GB RAM  — mid-range+
+ *   tier:edge-plus  — 4–6 GB download, 4–8 GB RAM  — flagship only
+ */
+export type ModelTag =
+  | 'chat'
+  | 'embedding'
+  | 'multimodal'
+  | 'medical'
+  | 'edge'
+  | 'tier:nano'
+  | 'tier:compact'
+  | 'tier:edge-plus'
+  | 'recommended'
+  | 'requires-hf-token';
+
+/** A single entry in the Lokal ML model registry. */
+export interface ModelSpec {
+  /** Stable model ID (e.g. 'gemma4-e2b') */
+  id: string;
+  /** HuggingFace GGUF download URL */
+  url: string;
+  /** SHA-256 hex digest for integrity check */
+  sha256: string;
+  /** Download size in bytes */
+  size_bytes: number;
+  /** Minimum device RAM in MB */
+  min_ram_mb: number;
+  /** Human-readable description */
+  description: string;
+  /** Capability and tier tags */
+  tags: ModelTag[];
+  /** True if this is a highlighted top recommendation */
+  recommended: boolean;
+}
+
 // ─── Download ────────────────────────────────────────────────────────────────
 
 /** Options for ModelManager.downloadModel() */
@@ -71,8 +113,14 @@ export interface LokalPlugin {
 /** Configuration passed to Lokal.init() */
 export interface LokalConfig {
   /**
-   * The model ID to load (must already be downloaded via ModelManager).
-   * Example: 'gemma-2b-int4'
+   * The model to load. Two forms are accepted:
+   *
+   *   1. A registry model ID (e.g. `'gemma4-e2b'`) — the weights must
+   *      already be downloaded via `ModelManager.downloadModel()`.
+   *
+   *   2. An absolute path to a local `.gguf` file you manage yourself
+   *      (e.g. `'/var/mobile/Containers/.../custom.gguf'`). This lets
+   *      you ship your own quantized model outside the built-in registry.
    */
   model: string;
 

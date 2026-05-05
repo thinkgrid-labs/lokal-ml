@@ -1,28 +1,105 @@
 {
+  "_comment": "Lokal ML model registry. SHA-256 values are PLACEHOLDERS — verify against HuggingFace before shipping. Gemma models require accepting Google's terms at huggingface.co/google/gemma-4-e2b-it.",
   "models": {
-    "gemma-2b-int4": {
-      "id": "gemma-2b-int4",
-      "url": "https://huggingface.co/google/gemma-2b-GGUF/resolve/main/gemma-2b-it-q4_k_m.gguf",
-      "sha256": "PLACEHOLDER_SHA256_GEMMA_2B",
-      "size_bytes": 1610612736,
-      "min_ram_mb": 2200,
-      "description": "Gemma 2B instruction-tuned, 4-bit quantized"
+
+    "gemma4-e2b": {
+      "id": "gemma4-e2b",
+      "url": "https://huggingface.co/bartowski/gemma-4-e2b-it-GGUF/resolve/main/gemma-4-e2b-it-Q4_K_M.gguf",
+      "sha256": "PLACEHOLDER_SHA256_GEMMA4_E2B",
+      "size_bytes": 3200000000,
+      "min_ram_mb": 5000,
+      "description": "Gemma 4 E2B (2.3B active / 5.1B total with embeddings) — Google's edge-optimised multimodal model. 128K context. Best overall choice for mobile.",
+      "tags": ["chat", "multimodal", "edge", "tier:edge-plus", "recommended", "requires-hf-token"],
+      "recommended": true
     },
-    "qwen-1.5b-int4": {
-      "id": "qwen-1.5b-int4",
-      "url": "https://huggingface.co/Qwen/Qwen1.5-1.8B-Chat-GGUF/resolve/main/qwen1_5-1_8b-chat-q4_k_m.gguf",
-      "sha256": "PLACEHOLDER_SHA256_QWEN_1_5B",
-      "size_bytes": 1073741824,
-      "min_ram_mb": 1500,
-      "description": "Qwen 1.5B chat, 4-bit quantized — suitable for 3 GB devices"
+
+    "gemma4-e4b": {
+      "id": "gemma4-e4b",
+      "url": "https://huggingface.co/bartowski/gemma-4-e4b-it-GGUF/resolve/main/gemma-4-e4b-it-Q4_K_M.gguf",
+      "sha256": "PLACEHOLDER_SHA256_GEMMA4_E4B",
+      "size_bytes": 5000000000,
+      "min_ram_mb": 7500,
+      "description": "Gemma 4 E4B (4.5B active / 8B total with embeddings) — highest-quality edge model for flagship phones. 128K context, multimodal.",
+      "tags": ["chat", "multimodal", "edge", "tier:edge-plus", "recommended", "requires-hf-token"],
+      "recommended": true
     },
+
+    "gemma3-4b": {
+      "id": "gemma3-4b",
+      "url": "https://huggingface.co/google/gemma-3-4b-it-qat-q4_0-gguf/resolve/main/gemma-3-4b-it-q4_0.gguf",
+      "sha256": "PLACEHOLDER_SHA256_GEMMA3_4B",
+      "size_bytes": 2520000000,
+      "min_ram_mb": 4000,
+      "description": "Gemma 3 4B — official Google QAT Q4_0 quantization. Solid mid-range choice, excellent instruction following. 128K context.",
+      "tags": ["chat", "multimodal", "tier:compact", "recommended", "requires-hf-token"],
+      "recommended": false
+    },
+
+    "gemma3-1b": {
+      "id": "gemma3-1b",
+      "url": "https://huggingface.co/google/gemma-3-1b-it-qat-q4_0-gguf/resolve/main/gemma-3-1b-it-q4_0.gguf",
+      "sha256": "PLACEHOLDER_SHA256_GEMMA3_1B",
+      "size_bytes": 620000000,
+      "min_ram_mb": 1024,
+      "description": "Gemma 3 1B — official Google QAT Q4_0. Ultra-light nano model, runs on any modern phone. Best for low-latency assistants.",
+      "tags": ["chat", "tier:nano", "requires-hf-token"],
+      "recommended": false
+    },
+
+    "medgemma-4b": {
+      "id": "medgemma-4b",
+      "url": "https://huggingface.co/bartowski/medgemma-4b-it-GGUF/resolve/main/medgemma-4b-it-Q4_K_M.gguf",
+      "sha256": "PLACEHOLDER_SHA256_MEDGEMMA_4B",
+      "size_bytes": 2520000000,
+      "min_ram_mb": 4000,
+      "description": "MedGemma 4B — Gemma 3 fine-tuned by Google for medical text and image comprehension. For health and wellness apps. 128K context.",
+      "tags": ["chat", "multimodal", "medical", "tier:compact", "requires-hf-token"],
+      "recommended": false
+    },
+
+    "qwen3-4b": {
+      "id": "qwen3-4b",
+      "url": "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
+      "sha256": "PLACEHOLDER_SHA256_QWEN3_4B",
+      "size_bytes": 2520000000,
+      "min_ram_mb": 3500,
+      "description": "Qwen3 4B — Alibaba's best compact model. Reasoning performance rivals 72B-class models. 256K context. Great alternative to Gemma on mid-range devices.",
+      "tags": ["chat", "tier:compact"],
+      "recommended": false
+    },
+
+    "qwen3-1.7b": {
+      "id": "qwen3-1.7b",
+      "url": "https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf",
+      "sha256": "PLACEHOLDER_SHA256_QWEN3_1_7B",
+      "size_bytes": 1070000000,
+      "min_ram_mb": 1800,
+      "description": "Qwen3 1.7B — strong reasoning for its size, 256K context. Excellent nano alternative for devices where Gemma 3 1B is too limited.",
+      "tags": ["chat", "tier:nano"],
+      "recommended": false
+    },
+
+    "qwen3-0.6b": {
+      "id": "qwen3-0.6b",
+      "url": "https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf",
+      "sha256": "PLACEHOLDER_SHA256_QWEN3_0_6B",
+      "size_bytes": 390000000,
+      "min_ram_mb": 768,
+      "description": "Qwen3 0.6B — the smallest practical chat model (~390 MB). Runs on entry-level phones. Ideal for simple assistants and on-device search.",
+      "tags": ["chat", "tier:nano"],
+      "recommended": false
+    },
+
     "all-minilm-l6-v2": {
       "id": "all-minilm-l6-v2",
       "url": "https://huggingface.co/second-state/All-MiniLM-L6-v2-Embedding-GGUF/resolve/main/all-MiniLM-L6-v2-Q8_0.gguf",
       "sha256": "PLACEHOLDER_SHA256_MINILM",
       "size_bytes": 23068672,
       "min_ram_mb": 256,
-      "description": "all-MiniLM-L6-v2 embedding model, 8-bit — 384-dim vectors for RAG"
+      "description": "all-MiniLM-L6-v2 embedding model, 8-bit — 384-dim vectors. Required for TalaDB RAG. Not a chat model.",
+      "tags": ["embedding"],
+      "recommended": false
     }
+
   }
 }

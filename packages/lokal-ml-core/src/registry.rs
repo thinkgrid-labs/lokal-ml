@@ -19,7 +19,7 @@ pub enum RegistryError {
 /// Specification for a single model entry in the registry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelSpec {
-    /// Stable model identifier (e.g. "gemma-2b-int4")
+    /// Stable model identifier (e.g. "gemma4-e2b")
     pub id: String,
     /// Direct download URL for the `.gguf` file
     pub url: String,
@@ -29,6 +29,15 @@ pub struct ModelSpec {
     pub size_bytes: u64,
     /// Minimum device RAM required in MB
     pub min_ram_mb: u64,
+    /// Human-readable description of the model
+    #[serde(default)]
+    pub description: String,
+    /// Capability and tier tags (e.g. "chat", "tier:compact", "recommended")
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// Whether this model is highlighted as a top recommendation
+    #[serde(default)]
+    pub recommended: bool,
 }
 
 /// The full registry manifest as deserialised from `models.json`.

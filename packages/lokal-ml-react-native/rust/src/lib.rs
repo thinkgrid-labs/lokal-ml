@@ -6,10 +6,17 @@
 //!
 //! All functions are `#[no_mangle] pub unsafe extern "C"` and follow the
 //! pattern established by `taladb-react-native/rust/src/lib.rs`.
+//!
+//! # `user_data` convention
+//! Callbacks that may fire from a background thread carry a `*mut c_void
+//! user_data` parameter. The caller (ObjC/Kotlin) casts a heap-allocated
+//! context struct to `void*`, passes it here, and reconstructs the pointer
+//! inside the callback. On the Rust side the pointer is held as `usize` while
+//! inside a `Send` closure to satisfy the trait bound without introducing UB.
 
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
-use std::os::raw::c_char;
+use std::os::raw::{c_char, c_void};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -20,8 +27,6 @@ use lokal_ml_core::{
 };
 
 // ─── Tokio runtime ────────────────────────────────────────────────────────────
-// A single multi-threaded runtime shared across all FFI calls. Initialised
-// lazily on first use so it doesn't consume resources until needed.
 
 fn tokio_rt() -> &'static tokio::runtime::Runtime {
     static RT: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
@@ -36,8 +41,6 @@ fn tokio_rt() -> &'static tokio::runtime::Runtime {
 }
 
 // ─── Global engine registry ───────────────────────────────────────────────────
-// Maps opaque u32 handles → loaded LokalEngine instances wrapped in Arc so
-// inference can proceed without holding the global mutex.
 
 type EngineStore = Mutex<HashMap<u32, Arc<LokalEngine>>>;
 
@@ -48,42 +51,27 @@ fn engine_store() -> &'static EngineStore {
 
 static NEXT_HANDLE: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
 
-// ─── Embedded registry (stub) ────────────────────────────────────────────────
-// In production this is fetched from the CDN on first install.
+// ─── Embedded registry ────────────────────────────────────────────────────────
+
 const EMBEDDED_REGISTRY: &str = include_str!("../../../../registry/models.json");
 
 // ─── Path helpers ─────────────────────────────────────────────────────────────
 
-/// Return a best-effort app cache directory for storing model files.
-/// On iOS the actual cache path is passed from ObjC via `lokal_init_engine`;
-/// this fallback is used in tests and on platforms without a host layer.
 fn default_cache_dir() -> PathBuf {
     std::env::temp_dir().join("lokal-ml-cache")
 }
 
-/// Validate that `path` is an absolute path that does not escape the expected
-/// cache root. Returns the canonicalized path on success.
-///
-/// Prevents a caller from passing `../../etc/passwd` to `lokal_init_engine`.
 fn safe_model_path(raw: &str) -> Option<PathBuf> {
     let path = Path::new(raw);
-
-    // Must be absolute so we can verify containment.
     if !path.is_absolute() {
         return None;
     }
-
-    // Reject obvious traversal attempts before the file exists.
-    let components: Vec<_> = path.components().collect();
-    if components.iter().any(|c| matches!(c, std::path::Component::ParentDir)) {
+    if path.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
         return None;
     }
-
-    // Must end in .gguf — prevents loading arbitrary files.
     if path.extension().and_then(|e| e.to_str()) != Some("gguf") {
         return None;
     }
-
     Some(path.to_path_buf())
 }
 
@@ -107,22 +95,37 @@ pub unsafe extern "C" fn lokal_check_requirements(model_id: *const c_char) -> bo
 }
 
 /// Begin (or resume) downloading the model weights to the device cache.
-/// `on_progress` may be NULL — if provided, it is called with a float in [0,1].
+///
+/// `on_progress(progress, user_data)` fires with a float in \[0, 1\]; may be NULL.
+/// `on_complete(success, user_data)` fires when the download finishes or fails;
+/// the caller must free any heap-allocated `user_data` inside this callback.
 #[no_mangle]
 pub unsafe extern "C" fn lokal_download_model(
     model_id: *const c_char,
     require_wifi: bool,
-    on_progress: Option<unsafe extern "C" fn(f32)>,
+    on_progress: Option<unsafe extern "C" fn(f32, *mut c_void)>,
+    on_progress_user_data: *mut c_void,
+    on_complete: Option<unsafe extern "C" fn(bool, *mut c_void)>,
+    on_complete_user_data: *mut c_void,
 ) {
     if model_id.is_null() {
+        if let Some(cb) = on_complete {
+            unsafe { cb(false, on_complete_user_data) };
+        }
         return;
     }
     let id = unsafe { CStr::from_ptr(model_id).to_string_lossy().to_string() };
 
     let Ok(registry) = Registry::from_json(EMBEDDED_REGISTRY) else {
+        if let Some(cb) = on_complete {
+            unsafe { cb(false, on_complete_user_data) };
+        }
         return;
     };
     let Ok(spec) = registry.get(&id) else {
+        if let Some(cb) = on_complete {
+            unsafe { cb(false, on_complete_user_data) };
+        }
         return;
     };
 
@@ -131,25 +134,39 @@ pub unsafe extern "C" fn lokal_download_model(
     let sha256 = spec.sha256.clone();
     let total_bytes = spec.size_bytes;
 
+    // Cast raw pointers to usize for Send-compatibility inside async closures.
+    let on_progress_ud = on_progress_user_data as usize;
+    let on_complete_ud = on_complete_user_data as usize;
+
     tokio_rt().spawn(async move {
         let options = lokal_ml_core::downloader::DownloadOptions {
             require_wifi,
             on_progress: on_progress.map(|cb| {
                 let f: Box<dyn Fn(f32) + Send + Sync> = Box::new(move |p| {
-                    // Safety: the callback is a plain C function pointer with no
-                    // captures; it is safe to call from any thread.
-                    unsafe { cb(p) };
+                    unsafe { cb(p, on_progress_ud as *mut c_void) };
                 });
                 f
             }),
         };
 
-        if let Err(e) = lokal_ml_core::downloader::download_model(
-            &url, &dest, total_bytes, &sha256, &options,
+        let success = match lokal_ml_core::downloader::download_model(
+            &url,
+            &dest,
+            total_bytes,
+            &sha256,
+            &options,
         )
         .await
         {
-            tracing::error!("lokal_download_model failed: {}", e);
+            Ok(_) => true,
+            Err(e) => {
+                tracing::error!("lokal_download_model failed: {}", e);
+                false
+            }
+        };
+
+        if let Some(cb) = on_complete {
+            unsafe { cb(success, on_complete_ud as *mut c_void) };
         }
     });
 }
@@ -181,9 +198,6 @@ pub unsafe extern "C" fn lokal_delete_model(model_id: *const c_char) {
 
 /// Initialise the inference engine for the given model path.
 /// Returns an opaque u32 handle (0 on failure).
-///
-/// The caller is responsible for passing a valid absolute path to a `.gguf`
-/// file inside the app's cache directory (see `modelCachePath()` in LokalML.mm).
 #[no_mangle]
 pub unsafe extern "C" fn lokal_init_engine(model_path: *const c_char) -> u32 {
     if model_path.is_null() {
@@ -213,38 +227,68 @@ pub unsafe extern "C" fn lokal_init_engine(model_path: *const c_char) -> u32 {
 }
 
 /// Run inference on the engine identified by `handle`, streaming tokens via
-/// the provided callback. `on_token` may be NULL (batch-only mode).
+/// `on_token`. Blocks until inference finishes, then calls `on_complete`.
 ///
-/// The engine Arc is cloned out of the store before the mutex is released,
-/// so inference does not block concurrent `lokal_init_engine` / `lokal_dispose_engine` calls.
+/// Both callbacks may be NULL. The `user_data` pointers are passed through
+/// opaquely — the caller is responsible for allocation and freeing (typically
+/// inside `on_complete`).
+///
+/// This function is synchronous; call it from a background thread (e.g. a GCD
+/// concurrent queue or a Kotlin coroutine dispatcher).
 #[no_mangle]
 pub unsafe extern "C" fn lokal_chat_stream(
     handle: u32,
     prompt: *const c_char,
-    on_token: Option<unsafe extern "C" fn(*const c_char)>,
+    on_token: Option<unsafe extern "C" fn(*const c_char, *mut c_void)>,
+    on_token_user_data: *mut c_void,
+    on_complete: Option<unsafe extern "C" fn(u32, u64, *mut c_void)>,
+    on_complete_user_data: *mut c_void,
 ) {
     if prompt.is_null() {
+        if let Some(cb) = on_complete {
+            unsafe { cb(0, 0, on_complete_user_data) };
+        }
         return;
     }
     let prompt_str = unsafe { CStr::from_ptr(prompt).to_string_lossy().to_string() };
 
-    // Clone the Arc and immediately release the lock so the mutex is not held
-    // for the duration of inference (which can take several seconds).
     let engine = {
         let store = engine_store().lock().unwrap();
         store.get(&handle).cloned()
     };
 
-    if let Some(engine) = engine {
-        let _ = engine.chat_stream(&prompt_str, move |tok| {
-            if let Some(cb) = on_token {
-                if let Ok(c) = CString::new(tok) {
-                    // Safety: `cb` is a plain C function pointer; `c` lives for
-                    // the duration of this closure invocation.
-                    unsafe { cb(c.as_ptr()) };
-                }
+    let Some(engine) = engine else {
+        tracing::warn!("lokal_chat_stream: invalid handle {}", handle);
+        if let Some(cb) = on_complete {
+            unsafe { cb(0, 0, on_complete_user_data) };
+        }
+        return;
+    };
+
+    // Cast to usize so the closure satisfies `Send` without UB: the pointer is
+    // only reconstructed back to `*mut c_void` immediately before the C call,
+    // which happens on the same thread that owns the context.
+    let on_token_ud = on_token_user_data as usize;
+
+    let generated = Arc::new(std::sync::atomic::AtomicU32::new(0));
+    let gen_for_closure = Arc::clone(&generated);
+
+    let start = std::time::Instant::now();
+
+    let _ = engine.chat_stream(&prompt_str, move |tok| {
+        gen_for_closure.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if let Some(cb) = on_token {
+            if let Ok(c) = CString::new(tok) {
+                unsafe { cb(c.as_ptr(), on_token_ud as *mut c_void) };
             }
-        });
+        }
+    });
+
+    let elapsed_ms = start.elapsed().as_millis() as u64;
+    let n_generated = generated.load(std::sync::atomic::Ordering::Relaxed);
+
+    if let Some(cb) = on_complete {
+        unsafe { cb(n_generated, elapsed_ms, on_complete_user_data) };
     }
 }
 

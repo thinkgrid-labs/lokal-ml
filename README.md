@@ -45,11 +45,48 @@ lokal-ml/
 
 ### Model Registry
 
-| Model ID | Description | Size | Min RAM |
-|---|---|---|---|
-| `gemma-2b-int4` | Gemma 2B instruction-tuned, 4-bit quantized | ~1.5 GB | 2200 MB |
-| `qwen-1.5b-int4` | Qwen 1.5B chat, 4-bit quantized | ~1.0 GB | 1500 MB |
-| `all-minilm-l6-v2` | all-MiniLM-L6-v2 embeddings, 8-bit (RAG only) | ~22 MB | 256 MB |
+The registry ships 9 models across three device tiers. **Gemma 4 E-series is our top recommendation** — these are Google's purpose-built edge models with 128K context and multimodal support, tuned specifically for on-device deployment.
+
+> **Note:** Gemma and MedGemma models require accepting Google's terms on HuggingFace before the download URL resolves. Qwen3 models are fully open.
+
+#### ⭐ Recommended — Gemma 4 Edge (flagship & high-end phones)
+
+| Model ID | Active / Total Params | Size | Min RAM | Notes |
+|---|---|---|---|---|
+| `gemma4-e2b` | 2.3B / 5.1B | ~3.2 GB | 5 GB | **Best overall.** Multimodal, 128K ctx |
+| `gemma4-e4b` | 4.5B / 8B | ~5.0 GB | 7.5 GB | Best quality. Multimodal, 128K ctx |
+
+#### Compact (mid-range phones, iPad)
+
+| Model ID | Params | Size | Min RAM | Notes |
+|---|---|---|---|---|
+| `gemma3-4b` | 4B | ~2.5 GB | 4 GB | Google QAT Q4_0. Solid & proven |
+| `medgemma-4b` | 4B | ~2.5 GB | 4 GB | Medical text + image comprehension |
+| `qwen3-4b` | 4B | ~2.5 GB | 3.5 GB | 256K ctx. Great reasoning |
+
+#### Nano (any modern phone, < 1 GB)
+
+| Model ID | Params | Size | Min RAM | Notes |
+|---|---|---|---|---|
+| `gemma3-1b` | 1B | ~620 MB | 1 GB | Google QAT Q4_0. Ultra-fast |
+| `qwen3-1.7b` | 1.7B | ~1.1 GB | 1.8 GB | 256K ctx. Better reasoning than 1B |
+| `qwen3-0.6b` | 0.6B | ~390 MB | 768 MB | Smallest practical chat model |
+
+#### Embedding (RAG only)
+
+| Model ID | Size | Notes |
+|---|---|---|
+| `all-minilm-l6-v2` | ~23 MB | 384-dim vectors for TalaDB RAG |
+
+#### Bring your own GGUF
+
+Pass an absolute path instead of a model ID to load any GGUF you manage yourself:
+
+```ts
+const ai = await Lokal.init({ model: '/path/to/your/custom.gguf' });
+```
+
+Useful for private fine-tunes, enterprise models, or any quantisation not in the registry. The hardware profiler still runs, but SHA-256 verification is your responsibility.
 
 ---
 

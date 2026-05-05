@@ -2,8 +2,8 @@ import type { LokalConfig, ChatOptions, ChatResponse, PluginRegistry, LokalPlugi
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const LokalMLNative = (global as any).LokalMLNative as {
-  initEngine(config: { model: string; contextSize: number; threads: number }): number;
-  chat(handle: number, options: Record<string, unknown>): ChatResponse;
+  initEngine(config: { model: string; contextSize: number; threads: number }): Promise<number>;
+  chat(handle: number, options: Record<string, unknown>): Promise<ChatResponse>;
   disposeEngine(handle: number): void;
 };
 
